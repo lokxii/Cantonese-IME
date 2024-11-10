@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <climits>
 #include <fstream>
 #include <ranges>
 #include <string_view>
@@ -174,42 +175,57 @@ std::vector<std::string> IME::candidates(const std::string& input) {
         return {};
     }
 
-    auto candidates =
-        codes.get_all(words[0]) | rv::transform([&](const auto& head) {
-            return vocabs.contains(head)
-                       ? vocabs[head]
-                       : std::vector<std::pair<std::string, size_t>>();
-        }) |
-        flatten<std::pair<std::string, size_t>>();
+    auto c1 = codes.get_all(words[0]) | rv::transform([&](const auto& head) {
+                  return vocabs.contains(head)
+                             ? vocabs[head]
+                             : std::vector<std::pair<std::string, size_t>>();
+              }) |
+              flatten<std::pair<std::string, size_t>>();
     for (int i = 1; i < words.size(); i++) {
         auto sub_candidate = codes.get_all(words[i]);
-        candidates =
-            candidates | rv::filter([&](const auto& p) {
-                return utf8::distance(p.first.cbegin(), p.first.cend()) > i;
-            }) |
-            rv::filter([&](const auto& p) {
-                auto s = p.first.cbegin();
-                utf8::advance(s, i, p.first.cend());
-                auto e = s;
-                utf8::next(e, p.first.cend());
-                return std::find(
-                           sub_candidate.cbegin(),
-                           sub_candidate.cend(),
-                           std::string_view(s, e)) != sub_candidate.cend();
-            }) |
-            ranges::to<std::vector>();
+        c1 = c1 | rv::filter([&](const auto& p) {
+                 return utf8::distance(p.first.cbegin(), p.first.cend()) > i;
+             }) |
+             rv::filter([&](const auto& p) {
+                 auto s = p.first.cbegin();
+                 utf8::advance(s, i, p.first.cend());
+                 auto e = s;
+                 utf8::next(e, p.first.cend());
+                 return std::find(
+                            sub_candidate.cbegin(),
+                            sub_candidate.cend(),
+                            std::string_view(s, e)) != sub_candidate.cend();
+             }) |
+             ranges::to<std::vector>();
     }
 
-    std::sort(
-        candidates.begin(), candidates.end(), [](const auto& l, const auto& r) {
-            return l.second > r.second;
-        });
-    std::stable_sort(
-        candidates.begin(), candidates.end(), [](const auto& l, const auto& r) {
-            return utf8::distance(l.first.cbegin(), l.first.cend()) <
-                   utf8::distance(r.first.cbegin(), r.first.cend());
-        });
+    auto c2 = c1 | rv::transform([&](auto&& p) {
+                  std::string last_char;
+                  auto it = p.first.cend();
+                  utf8::append(
+                      utf8::prior(it, p.first.cbegin()),
+                      std::back_inserter(last_char));
+                  auto spell = dict[last_char];
+                  auto dist = spell.starts_with(words.back())
+                                  ? spell.length() - words.back().length()
+                                  : ULONG_MAX;
+                  return std::make_tuple(
+                      std::move(p.first), std::move(p.second), dist);
+              }) |
+              ranges::to<std::vector>();
+    c1.clear();
 
-    return candidates | rv::transform([](const auto& p) { return p.first; }) |
+    std::sort(c2.begin(), c2.end(), [](const auto& l, const auto& r) {
+        return std::get<1>(l) > std::get<1>(r);
+    });
+    std::stable_sort(c2.begin(), c2.end(), [](const auto& l, const auto& r) {
+        return utf8::distance(std::get<0>(l).cbegin(), std::get<0>(l).cend()) <
+               utf8::distance(std::get<0>(r).cbegin(), std::get<0>(r).cend());
+    });
+    std::stable_sort(c2.begin(), c2.end(), [](const auto& l, const auto& r) {
+        return std::get<2>(l) < std::get<2>(r);
+    });
+
+    return c2 | rv::transform([](const auto& t) { return std::get<0>(t); }) |
            ranges::to<std::vector>();
 }
