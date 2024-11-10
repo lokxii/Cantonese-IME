@@ -11,8 +11,8 @@ namespace rv = std::views;
 namespace ranges = std::ranges;
 
 const std::vector<std::string> initials = {
-    "a", "e", "i",  "o", "u",  "b",  "p", "m", "f",  "d", "t", "n", "l",
-    "g", "k", "ng", "h", "gw", "kw", "w", "j", "ch", "s", "y", "*",
+    "ng", "gw", "kw", "ch", "a", "e", "i", "o", "u", "b", "p", "m", "f",
+    "d",  "t",  "n",  "l",  "g", "k", "h", "w", "j", "s", "y", "*",
 };
 
 const std::vector<std::string> finals = {
@@ -118,11 +118,16 @@ std::vector<std::string> IME::split_words(const std::string& input) const {
     std::vector<std::string> out;
     auto it = input.cbegin();
     while (std::distance(input.cbegin(), it) < input.length()) {
-        auto prefix = std::string(1, *it);
-        auto pos = std::find(initials.cbegin(), initials.cend(), prefix);
-        if (pos == initials.cend()) {
+        std::string prefix;
+        for (const auto& initial : initials) {
+            if (std::string_view(it, input.cend()).starts_with(initial)) {
+                prefix = initial;
+                break;
+            }
+        }
+        if (prefix == "") {
+            out.push_back(std::string(1, *it));
             it += 1;
-            out.push_back(prefix);
             continue;
         }
 
@@ -202,5 +207,10 @@ std::vector<std::string> IME::candidates(const std::string& input) {
             }) |
             ranges::to<std::vector>();
     }
+    std::stable_sort(
+        candidates.begin(), candidates.end(), [](const auto& l, const auto& r) {
+            return utf8::distance(l.begin(), l.end()) <
+                   utf8::distance(r.begin(), r.end());
+        });
     return candidates;
 }
