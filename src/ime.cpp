@@ -15,15 +15,6 @@ const std::vector<std::string> initials = {
     "d",  "t",  "n",  "l",  "g", "k", "h", "w", "j", "s", "y", "*",
 };
 
-const std::vector<std::string> finals = {
-    "a",   "ai",   "aai", "au",  "aau", "am",  "aam", "an",  "aan",
-    "ang", "aang", "ap",  "aap", "at",  "aat", "ak",  "aak", "e",
-    "ei",  "eng",  "ek",  "i",   "iu",  "im",  "in",  "ing", "ip",
-    "it",  "ik",   "oh",  "oi",  "o",   "on",  "ong", "ot",  "ok",
-    "oo",  "ooi",  "oon", "oot", "ui",  "un",  "ung", "ut",  "uk",
-    "euh", "eung", "euk", "ue",  "uen", "uet", "m",   "ng",
-};
-
 DAGDict codes_from_file(std::ifstream&& code_f) {
     std::string line;
     std::vector<std::pair<std::string, std::vector<std::string>>> codes;
@@ -115,7 +106,7 @@ std::vector<std::string> IME::split_words(const std::string& input) const {
         }
 
         auto possible_keys = codes.possible_keys(prefix);
-        std::stable_sort(
+        std::sort(
             possible_keys.begin(),
             possible_keys.end(),
             [](const std::string& l, const std::string& r) {
@@ -132,8 +123,20 @@ std::vector<std::string> IME::split_words(const std::string& input) const {
             it += (*word_it).length();
             continue;
         }
-        out.push_back(prefix);
-        it += 1;
+        auto indicies =
+            possible_keys | rv::transform([&](const auto& key) {
+                int i = 1;
+                for (; i <= key.length() && i <= view.length(); i++) {
+                    if (key.substr(0, i) != view.substr(0, i)) {
+                        break;
+                    }
+                }
+                return i - 1;
+            }) |
+            ranges::to<std::vector>();
+        auto max = *ranges::max_element(indicies);
+        out.emplace_back(it, it + max);
+        it += max;
     }
     return out;
 }
