@@ -27,7 +27,7 @@ struct flatten : ranges::range_adaptor_closure<flatten<T>> {
 };
 
 const std::vector<std::string> initials = {
-    "ng", "gw", "kw", "ch", "a", "e", "i", "o", "u", "b", "p", "m", "f",
+    "ng", "gw", "kw", "ch", "a", "i", "o", "u", "b", "p", "m", "f",
     "d",  "t",  "n",  "l",  "g", "k", "h", "w", "j", "s", "y", "*",
 };
 
