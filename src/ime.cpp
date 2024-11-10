@@ -10,14 +10,31 @@
 namespace rv = std::views;
 namespace ranges = std::ranges;
 
+template <typename T>
+struct flatten : ranges::range_adaptor_closure<flatten<T>> {
+    flatten() {}
+    constexpr std::vector<T> operator()(const ranges::range auto&& r) {
+        std::vector<T> out;
+        for (auto&& l : r) {
+            out.insert(
+                out.end(),
+                std::make_move_iterator(l.cbegin()),
+                std::make_move_iterator(l.cend()));
+        }
+        return out;
+    }
+};
+
 const std::vector<std::string> initials = {
     "ng", "gw", "kw", "ch", "a", "e", "i", "o", "u", "b", "p", "m", "f",
     "d",  "t",  "n",  "l",  "g", "k", "h", "w", "j", "s", "y", "*",
 };
 
-DAGDict codes_from_file(std::ifstream&& code_f) {
+std::pair<DAGDict, std::unordered_map<std::string, std::string>>
+codes_from_file(std::ifstream&& code_f) {
     std::string line;
     std::vector<std::pair<std::string, std::vector<std::string>>> codes;
+    std::unordered_map<std::string, std::string> dict;
 
     while (std::getline(code_f, line, ',')) {
         auto it = std::find(line.cbegin(), line.cend(), ' ');
@@ -33,7 +50,14 @@ DAGDict codes_from_file(std::ifstream&& code_f) {
         }
         codes.push_back(std::make_pair(key, chars));
     }
-    return DAGDict(codes);
+    dict = codes | rv::transform([](const auto& p) {
+               return p.second | rv::transform([&](const auto& w) {
+                          return std::make_pair(w, p.first);
+                      });
+           }) |
+           flatten<std::pair<std::string, std::string>>() |
+           ranges::to<std::unordered_map>();
+    return std::make_pair(DAGDict(codes), std::move(dict));
 }
 
 // template <typename T>
@@ -78,7 +102,9 @@ vocab_from_file(std::ifstream&& words_f) {
 
 IME::IME(std::filesystem::path path_to_data) {
     auto code_f = std::ifstream(path_to_data / "codecantonese.csv");
-    this->codes = codes_from_file(std::move(code_f));
+    auto [codes, dict] = codes_from_file(std::move(code_f));
+    this->codes = std::move(codes);
+    this->dict = std::move(dict);
 
     auto expand_rules_f = std::ifstream(path_to_data / "codeexpand.csv");
     // this->expand_rules =
@@ -141,21 +167,6 @@ std::vector<std::string> IME::split_words(const std::string& input) const {
     return out;
 }
 
-struct flatten : ranges::range_adaptor_closure<flatten> {
-    flatten() {}
-    constexpr std::vector<std::pair<std::string, size_t>> operator()(
-        const ranges::range auto&& r) {
-        std::vector<std::pair<std::string, size_t>> out;
-        for (auto&& l : r) {
-            out.insert(
-                out.end(),
-                std::make_move_iterator(l.cbegin()),
-                std::make_move_iterator(l.cend()));
-        }
-        return out;
-    }
-};
-
 std::vector<std::string> IME::candidates(const std::string& input) {
     // TODO: replace wrong input... HOW?
     auto words = split_words(input);
@@ -169,7 +180,7 @@ std::vector<std::string> IME::candidates(const std::string& input) {
                        ? vocabs[head]
                        : std::vector<std::pair<std::string, size_t>>();
         }) |
-        flatten();
+        flatten<std::pair<std::string, size_t>>();
     for (int i = 1; i < words.size(); i++) {
         auto sub_candidate = codes.get_all(words[i]);
         candidates =
