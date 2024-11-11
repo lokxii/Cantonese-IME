@@ -37,7 +37,7 @@ codes_from_file(std::ifstream&& code_f) {
     std::vector<std::pair<std::string, std::vector<std::string>>> codes;
     std::unordered_map<std::string, std::string> dict;
 
-    while (std::getline(code_f, line, ',')) {
+    while (std::getline(code_f, line)) {
         auto it = std::find(line.cbegin(), line.cend(), ' ');
         auto key = std::string(line.cbegin(), it);
         it++;
