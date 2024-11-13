@@ -144,26 +144,22 @@ std::vector<std::string> IME::split_words(const std::string& input) const {
         auto word_it = std::find_if(
             possible_keys.cbegin(),
             possible_keys.cend(),
-            [&](const std::string& key) { return view.starts_with(key); });
+            [&](const std::string& key) {
+                return key.length() < view.length() ? view.starts_with(key)
+                                                    : key.starts_with(view);
+            });
         if (word_it != possible_keys.cend()) {
-            out.push_back(*word_it);
-            it += (*word_it).length();
+            if (word_it->length() < view.length()) {
+                out.push_back(*word_it);
+                it += (*word_it).length();
+            } else {
+                out.push_back(std::string(view));
+                it += view.length();
+            }
             continue;
         }
-        auto indicies =
-            possible_keys | rv::transform([&](const auto& key) {
-                int i = 1;
-                for (; i <= key.length() && i <= view.length(); i++) {
-                    if (key.substr(0, i) != view.substr(0, i)) {
-                        break;
-                    }
-                }
-                return i - 1;
-            }) |
-            ranges::to<std::vector>();
-        auto max = *ranges::max_element(indicies);
-        out.emplace_back(it, it + max);
-        it += max;
+        out.emplace_back(it, it + 1);
+        it += 1;
     }
     return out;
 }
