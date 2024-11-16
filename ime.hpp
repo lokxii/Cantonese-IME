@@ -8,9 +8,9 @@ class IME {
    public:
     IME(std::filesystem::path path_to_data);
     std::vector<std::string> candidates(const std::string& input);
+    std::vector<std::string> split_words(const std::string& input) const;
 
    private:
-    std::vector<std::string> split_words(const std::string& input) const;
     DAGDict codes;
     std::unordered_map<std::string, std::string> dict;
     std::unordered_map<std::string, std::vector<std::pair<std::string, size_t>>>
