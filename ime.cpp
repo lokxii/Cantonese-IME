@@ -31,6 +31,15 @@ const std::vector<std::string> initials = {
     "d",  "t",  "n",  "l",  "g", "k", "h", "w", "j", "s", "y", "*",
 };
 
+const std::vector<std::string> finals = {
+    "eung", "aang", "ung", "uet", "uen", "oot", "oon", "ooi", "ong",
+    "ing",  "euk",  "euh", "eng", "ang", "aau", "aat", "aap", "aan",
+    "aam",  "aak",  "aai", "ut",  "un",  "uk",  "ui",  "ue",  "ot",
+    "oo",   "on",   "ok",  "oi",  "oh",  "ng",  "iu",  "it",  "ip",
+    "in",   "im",   "ik",  "ek",  "ei",  "au",  "at",  "ap",  "an",
+    "am",   "ak",   "ai",  "o",   "m",   "i",   "e",   "a",
+};
+
 std::pair<DAGDict, std::unordered_map<std::string, std::string>>
 codes_from_file(std::ifstream&& code_f) {
     std::string line;
@@ -117,63 +126,102 @@ IME::IME(std::filesystem::path path_to_data) {
 
 std::vector<std::string> IME::split_words(const std::string& input) const {
     std::vector<std::string> out;
-    auto it = input.cbegin();
-    while (std::distance(input.cbegin(), it) < input.length()) {
-        std::string prefix;
-        for (const auto& initial : initials) {
-            if (std::string_view(it, input.cend()).starts_with(initial)) {
-                prefix = initial;
+    auto it = input.cend();
+    while (std::distance(it, input.cend()) < input.length()) {
+        std::string word;
+
+        std::string suffix;
+        for (const auto& final : finals) {
+            if (std::string_view(input.cbegin(), it).ends_with(final)) {
+                suffix = final;
+                it -= final.length();
                 break;
             }
         }
-        if (prefix == "") {
-            out.push_back(std::string(1, *it));
-            it += 1;
-            continue;
-        }
 
-        auto possible_keys = codes.possible_keys(prefix);
-        std::sort(
-            possible_keys.begin(),
-            possible_keys.end(),
-            [](const std::string& l, const std::string& r) {
-                return l.length() > r.length();
-            });
-
-        auto view = std::string_view(it, input.end());
-        auto word_it = std::find_if(
-            possible_keys.cbegin(),
-            possible_keys.cend(),
-            [&](const std::string& key) {
-                return key.length() < view.length() ? view.starts_with(key)
-                                                    : key.starts_with(view);
-            });
-        if (word_it != possible_keys.cend()) {
-            if (word_it->length() < view.length()) {
-                out.push_back(*word_it);
-                it += (*word_it).length();
-            } else {
-                out.push_back(std::string(view));
-                it += view.length();
+        for (const auto& initial : initials) {
+            if (!std::string_view(input.cbegin(), it).ends_with(initial)) {
+                continue;
             }
-            continue;
+            if (codes.possible_keys(initial + suffix).empty()) {
+                continue;
+            }
+            word = initial + suffix;
+            it -= initial.length();
+            break;
         }
-        auto indicies =
-            possible_keys | rv::transform([&](const auto& key) {
-                int i = 1;
-                for (; i <= key.length() && i <= view.length(); i++) {
-                    if (key.substr(0, i) != view.substr(0, i)) {
-                        break;
-                    }
-                }
-                return i - 1;
-            }) |
-            ranges::to<std::vector>();
-        auto max = *ranges::max_element(indicies);
-        out.emplace_back(it, it + max);
-        it += max;
+
+        if (word.empty()) {
+            if (suffix.length() &&
+                std::find(initials.cbegin(), initials.cend(), suffix) !=
+                    initials.cend()) {
+                out.push_back(suffix);
+            } else {
+                out.push_back(std::string(1, *it));
+                it -= 1;
+            }
+        } else {
+            out.push_back(word);
+        }
     }
-    return out;
+
+    return std::vector(out.rbegin(), out.rend());
+    // while (std::distance(input.cbegin(), it) < input.length()) {
+    //     std::string prefix;
+    //     for (const auto& initial : initials) {
+    //         if (std::string_view(it, input.cend()).starts_with(initial)) {
+    //             prefix = initial;
+    //             break;
+    //         }
+    //     }
+    //     if (prefix == "") {
+    //         out.push_back(std::string(1, *it));
+    //         it += 1;
+    //         continue;
+    //     }
+
+    //     auto possible_keys = codes.possible_keys(prefix);
+    //     std::sort(
+    //         possible_keys.begin(),
+    //         possible_keys.end(),
+    //         [](const std::string& l, const std::string& r) {
+    //             return l.length() > r.length();
+    //         });
+
+    //     auto view = std::string_view(it, input.end());
+    //     auto word_it = std::find_if(
+    //         possible_keys.cbegin(),
+    //         possible_keys.cend(),
+    //         [&](const std::string& key) {
+    //             return key.length() < view.length() ? view.starts_with(key)
+    //                                                 : key.starts_with(view);
+    //         });
+    //     if (word_it != possible_keys.cend()) {
+    //         if (word_it->length() < view.length()) {
+    //             out.push_back(*word_it);
+    //             it += (*word_it).length();
+    //         } else {
+    //             out.push_back(std::string(view));
+    //             it += view.length();
+    //         }
+    //         continue;
+    //     }
+    //     auto indicies =
+    //         possible_keys | rv::transform([&](const auto& key) {
+    //             int i = 1;
+    //             for (; i <= key.length() && i <= view.length(); i++) {
+    //                 if (key.substr(0, i) != view.substr(0, i)) {
+    //                     break;
+    //                 }
+    //             }
+    //             return i - 1;
+    //         }) |
+    //         ranges::to<std::vector>();
+    //     auto max = *ranges::max_element(indicies);
+    //     out.emplace_back(it, it + max);
+    //     it += max;
+    // }
+    // return out;
 }
 
 std::vector<std::string> IME::candidates(const std::string& input) {
