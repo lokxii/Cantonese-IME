@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <climits>
 #include <fstream>
+#include <iostream>
 #include <ranges>
 #include <string_view>
 
@@ -37,7 +38,7 @@ const std::vector<std::string> finals = {
     "aam",  "aak",  "aai", "ut",  "un",  "uk",  "ui",  "ue",  "ot",
     "oo",   "on",   "ok",  "oi",  "oh",  "ng",  "iu",  "it",  "ip",
     "in",   "im",   "ik",  "ek",  "ei",  "au",  "at",  "ap",  "an",
-    "am",   "ak",   "ai",  "o",   "m",   "i",   "e",   "a",
+    "am",   "ak",   "ai",  "o",   "m",   "i",   "e",   "a",   "u",
 };
 
 std::pair<DAGDict, std::unordered_map<std::string, std::string>>
